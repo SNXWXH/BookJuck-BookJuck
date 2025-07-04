@@ -7,7 +7,6 @@ import { fetchWithAuthOnServer } from '@/lib/fetch-with-auth-server'
 import { BookType, ProfileType } from '../_types'
 
 export const dynamic = 'force-dynamic'
-export const revalidate = 0
 
 export default async function MyPage() {
   let statisicData: StatisicType | null = null
