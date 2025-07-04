@@ -6,7 +6,7 @@ import { MonthlyBookType, StatisicType, TagBookType } from './_types'
 import { fetchWithAuthOnServer } from '@/lib/fetch-with-auth-server'
 import { BookType, ProfileType } from '../_types'
 
-export const dynamic = 'force-dynamic'
+// export const dynamic = 'force-dynamic'
 
 export default async function MyPage() {
   let statisicData: StatisicType | null = null
@@ -37,7 +37,9 @@ export default async function MyPage() {
     else console.error('통계 데이터 로딩 실패:', results[0].reason)
 
     if (results[1].status === 'fulfilled')
+      // monthlyBookData = [...results[1].value].reverse()
       monthlyBookData = [...results[1].value].reverse()
+      
     else
       console.error(
         '월별 독서량 데이터 로딩 실패:',
