@@ -111,7 +111,7 @@ export default async function MyPage() {
           {monthlyBookData && (
             <Graph
               title="MonthlyGraph"
-              data={monthlyBookData.reverse()}
+              data={[...monthlyBookData].reverse()}
             />
           )}
           {tagBookData && (
