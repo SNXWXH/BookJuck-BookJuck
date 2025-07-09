@@ -12,7 +12,7 @@ export default function RecentBookItem({
   rating,
 }: RecentBookItemPropsType) {
   return (
-    <div className="flex justify-between items-center h-24 bg-blue-50 rounded-lg px-2 md:px-6">
+    <div className="flex justify-between items-center h-24 bg-blue-50/50 rounded-lg px-2 md:px-6">
       <div className="w-3/5">
         <p className="font-bold truncate">{title}</p>
         <p className="text-sm text-gray-600 truncate">{author}</p>
