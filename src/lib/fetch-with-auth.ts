@@ -29,7 +29,7 @@ export async function fetchWithAuth<T = unknown>(
     `${API_URL_CLIENT}${endpoint}`,
     requestOptions,
   )
-  console.log(res)
+  // console.log(res)
 
   if (res.status === 401) {
     try {
