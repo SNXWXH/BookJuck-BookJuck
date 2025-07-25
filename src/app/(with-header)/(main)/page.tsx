@@ -1,257 +1,188 @@
 'use client'
 
-import Image from 'next/image'
-import { BookOpen } from 'lucide-react'
-import { FC, useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import {
-  BookType,
-  AddBookResponse,
-  DeleteBookResponse,
-} from '@/app/(with-header)/(main)/_types'
-import { fetchWithAuth } from '@/lib/fetch-with-auth'
-import Modal from '@/common/modal'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { Search } from 'lucide-react'
+import { BookType, RawBookItemType } from './_types'
+import BookCard from './_components/book-card'
+import BookCardSkeleton from './_components/skeleton/book-card-skeleton'
+import ListPageSkeleton from './_components/skeleton/list-page-skeleton'
 
-export interface BookCardPropsType {
-  book: BookType
-}
+const MAX_PAGE = 10 
 
-interface LibraryBook {
-  id: string
-  title: string
-  author: string
-  thumbnailUrl: string
-  review?: {
-    endDate?: string
-    memo?: string
-    rating?: number
-    tags?: string[]
-  }
-}
+export default function Home() {
+  const [query, setQuery] = useState('')
+  const [books, setBooks] = useState<BookType[]>([])
+  const [loading, setLoading] = useState(false)
+  const [initialLoading, setInitialLoading] = useState(true)
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(true)
+  const loaderRef = useRef<HTMLDivElement | null>(null)
 
-const BookCard: FC<BookCardPropsType> = ({ book }) => {
-  const [isAdded, setIsAdded] = useState(false)
-  const [libraryBookId, setLibraryBookId] = useState<string | null>(
-    null,
+  const fetchDefaultBooks = useCallback(
+    async (pageToLoad: number) => {
+      setLoading(true)
+      try {
+        const res = await fetch(`/api/aladin-list?page=${pageToLoad}`)
+        const text = await res.text()
+        const data = JSON.parse(text)
+
+        const mapped: BookType[] = (data.item || []).map(
+          (item: RawBookItemType) => ({
+            id: item.itemId,
+            cover:
+              item.cover ||
+              'https://via.placeholder.com/96x144?text=No+Image',
+            title: item.title || '제목 없음',
+            author: item.author || '저자 미상',
+            isbn: item.isbn || '',
+          }),
+        )
+
+        setBooks((prev) =>
+          pageToLoad === 1 ? mapped : [...prev, ...mapped],
+        )
+
+        if (!data.item || data.item.length === 0 || pageToLoad >= MAX_PAGE) {
+          setHasMore(false)
+        }
+      } catch (e) {
+        console.error('기본 리스트 불러오기 실패:', e)
+        setHasMore(false)
+      } finally {
+        setLoading(false)
+        setInitialLoading(false)
+      }
+    },
+    [],
   )
-  const [modalMessage, setModalMessage] = useState<string | null>(
-    null,
-  )
-  const [shouldRedirectAfterModal, setShouldRedirectAfterModal] =
-    useState(false)
-  const router = useRouter()
 
   useEffect(() => {
-    const checkIfBookExists = async () => {
-      // const cookies = document.cookie
-      // const accessToken = cookies
-      //   .split('; ')
-      //   .find((row) => row.startsWith('accessToken='))
-      //   ?.split('=')[1]
+    if (!query.trim()) {
+      fetchDefaultBooks(page)
+    }
+  }, [page, query, fetchDefaultBooks])
 
-      // if (!accessToken) {
-      //   return
-      // }
-
-      try {
-        const libraryBooks = await fetchWithAuth<LibraryBook[]>(
-          '/api/library?offset=0&limit=100',
-          { auth: true },
-        )
-        const existingBook = libraryBooks.find(
-          (b) => b.title === book.title && b.author === book.author,
-        )
-        if (existingBook) {
-          setIsAdded(true)
-          setLibraryBookId(existingBook.id)
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && hasMore && !loading) {
+          setPage((p) => p + 1)
         }
-      } catch (error) {
-        console.error('내 서재 상태 확인 실패:', error)
-      }
+      },
+      { rootMargin: '200px', threshold: 0.1 },
+    )
+    const el = loaderRef.current
+    if (el) observer.observe(el)
+    return () => {
+      if (el) observer.unobserve(el)
     }
+  }, [hasMore, loading])
 
-    checkIfBookExists()
-  }, [book.title, book.author])
-
-  const handleToggleLibrary = async () => {
-    const cookies = document.cookie
-    const accessToken = cookies
-      .split('; ')
-      .find((row) => row.startsWith('accessToken='))
-      ?.split('=')[1]
-
-    if (!accessToken) {
-      setModalMessage('로그인 후 이용해주세요.')
-      setShouldRedirectAfterModal(true)
-      return
-    }
-
+  const handleSearch = async () => {
+    if (!query.trim()) return
+    setLoading(true)
+    setInitialLoading(true)
     try {
-      if (!isAdded) {
-        const res = await fetchWithAuth<AddBookResponse>(
-          '/api/library',
-          {
-            method: 'POST',
-            auth: true,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              title: book.title,
-              author: book.author,
-              thumbnailUrl: book.cover,
-              isbn: book.isbn,
-            }),
-          },
-        )
+      const res = await fetch(
+        `/api/aladin-search?query=${encodeURIComponent(query)}`,
+      )
+      const text = await res.text()
+      const data = JSON.parse(text)
 
-        setLibraryBookId(res.book.id)
-        setModalMessage('내 서재에 추가되었습니다!')
-        setIsAdded(true)
-      } else {
-        if (!libraryBookId) {
-          setModalMessage('삭제할 책의 ID가 없습니다.')
-          return
-        }
+      const mapped: BookType[] = (data.item || []).map(
+        (item: RawBookItemType) => ({
+          id: item.itemId,
+          cover:
+            item.cover ||
+            'https://via.placeholder.com/96x144?text=No+Image',
+          title: item.title || '제목 없음',
+          author: item.author || '저자 미상',
+          isbn: item.isbn || '',
+        }),
+      )
 
-        await fetchWithAuth<DeleteBookResponse>(
-          `/api/library/${libraryBookId}`,
-          {
-            method: 'DELETE',
-            auth: true,
-          },
-        )
-
-        setModalMessage('내 서재에서 삭제되었습니다.')
-        setIsAdded(false)
-        setLibraryBookId(null)
-      }
-    } catch (error: unknown) {
-      console.error('에러 내용:', error)
-
-      let status: number | undefined
-
-      if (
-        typeof error === 'object' &&
-        error !== null &&
-        'status' in error &&
-        typeof (error as { status?: number }).status === 'number'
-      ) {
-        status = (error as { status: number }).status
-      } else if (
-        typeof error === 'object' &&
-        error !== null &&
-        'response' in error &&
-        typeof (error as { response?: { status?: number } }).response
-          ?.status === 'number'
-      ) {
-        status = (error as { response: { status: number } }).response
-          .status
-      } else if (
-        error instanceof Error &&
-        error.message.includes('이미')
-      ) {
-        status = 409
-      }
-
-      if (status === 401) {
-        setModalMessage('로그인 후 이용해주세요.')
-        setShouldRedirectAfterModal(true)
-      } else if (status === 409) {
-        setModalMessage('내 서재에 이미 존재하는 책입니다.')
-        setIsAdded(true)
-      } else if (status === 404) {
-        setModalMessage('삭제할 책을 찾을 수 없습니다.')
-        setIsAdded(false)
-        setLibraryBookId(null)
-      } else {
-        setModalMessage(
-          isAdded
-            ? '서재 삭제에 실패했습니다.'
-            : '서재 추가에 실패했습니다.',
-        )
-      }
+      setBooks(mapped)
+      setHasMore(false)
+    } catch (e) {
+      console.error('검색 실패:', e)
+      setBooks([])
+    } finally {
+      setLoading(false)
+      setInitialLoading(false)
     }
+  }
+
+  if (initialLoading) {
+    return <ListPageSkeleton />
   }
 
   return (
-    <>
-      <div className="bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow w-full h-[300px] flex flex-col overflow-hidden">
-        <div className="relative bg-gray-200 flex justify-center items-center h-[60%] p-4 rounded-t-lg">
-          <Image
-            src={book.cover || '/images/placeholder-book.svg'}
-            alt={book.title}
-            width={96}
-            height={144}
-            className="object-contain rounded max-h-full"
-          />
+    <main className="flex flex-col justify-center w-full mx-auto pt-2 p-8">
+      <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-12 text-center w-full leading-snug">
+        당신만의 독서 여행을&nbsp;
+        <br className="block sm:hidden" />
+        시작해 보세요
+      </h1>
 
-          <div className="absolute top-2 right-2 flex gap-2">
-            <button
-              onClick={handleToggleLibrary}
-              className="w-8 h-8 flex items-center justify-center bg-white text-black border border-gray-300 rounded-full hover:bg-gray-100 transition cursor-pointer"
-              aria-label={
-                isAdded ? '내 서재에서 삭제' : '내 서재에 추가'
+      <div className="w-full flex flex-col items-center">
+        <div className="relative w-full mb-12">
+          <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none">
+            <Search className="w-5 h-5" />
+          </span>
+          <input
+            type="text"
+            placeholder="책 제목이나 저자를 검색해보세요"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value)
+              if (!e.target.value.trim()) {
+                setPage(1)
+                setHasMore(true)
               }
-            >
-              <BookOpen
-                className="w-4 h-4"
-                stroke={isAdded ? '#22C55E' : 'black'}
-                fill={isAdded ? '#22C55E' : 'none'}
-              />
-            </button>
-          </div>
+            }}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+            className="w-full pl-10 pr-4 py-4 border-2 border-gray-300 rounded-xl bg-white placeholder-gray-500
+            focus:ring-1 focus:ring-inset focus:ring-gray-400 focus:outline-none
+            hover:bg-gray-100 hover:border-gray-500 transition"
 
-          {isAdded && (
-            <div
-              className="absolute bottom-2 left-2 text-white text-xs font-semibold px-3 py-1 rounded-full shadow-md select-none"
-              style={{ backgroundColor: '#22C55E' }}
-            >
-              읽음
-            </div>
-          )}
+
+          />
         </div>
 
-        <div className="h-[40%] px-3 py-2 flex flex-col justify-center items-center text-center">
-          <h3
-            className="text-lg font-semibold w-full truncate"
-            title={book.title}
-          >
-            {book.title}
-          </h3>
-          <p
-            className="text-base text-gray-500 w-full truncate"
-            title={book.author}
-          >
-            {book.author}
-          </p>
-          <p
-            className="text-sm text-gray-400 w-full truncate"
-            title={book.isbn}
-          >
-            ISBN: {book.isbn || '정보 없음'}
-          </p>
+        {!loading && query.trim() && books.length === 0 && (
+          <p className="text-center w-full">검색 결과가 없습니다.</p>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 w-full">
+          {books.map((book) => (
+            <BookCard
+              key={book.id}
+              book={book}
+            />
+          ))}
+
+          {loading &&
+            Array.from({ length: 4 }).map((_, i) => (
+              <BookCardSkeleton key={`skeleton-${i}`} />
+            ))}
+          {books.length > 0 &&
+            Array.from({
+              length: (4 - (books.length % 4)) % 4,
+            }).map((_, i) => (
+              <div
+                key={i}
+                className="h-[300px] invisible"
+              />
+            ))}
+        </div>
+
+        <div
+          ref={loaderRef}
+          className="h-8 flex justify-center items-center mt-4"
+        >
+          {loading && <p>로딩 중...</p>}
         </div>
       </div>
-
-      {modalMessage && (
-        <Modal>
-          <div className="text-center">
-            <p className="mb-4">{modalMessage}</p>
-            <button
-              onClick={() => {
-                setModalMessage(null)
-                if (shouldRedirectAfterModal) {
-                  router.push('/auth/log-in')
-                }
-              }}
-              className="px-4 py-2 bg-slate-950 text-white rounded hover:bg-slate-900 cursor-pointer"
-            >
-              확인
-            </button>
-          </div>
-        </Modal>
-      )}
-    </>
+    </main>
   )
 }
-
-export default BookCard
