@@ -149,6 +149,7 @@ export async function fetchWithAuthOnServer<T = unknown>(
         const cookies = setCookieHeader
           .split(',')
           .map((cookie) => cookie.trim())
+        console.log('🚀 ~ cookies:', cookies)
 
         for (const cookie of cookies) {
           if (cookie.startsWith('accessToken='))
