@@ -1,5 +1,5 @@
 import React, { ReactNode } from 'react'
-import { cookies } from 'next/headers'
+// import { cookies } from 'next/headers'
 import { fetchWithAuthOnServer } from '@/lib/fetch-with-auth-server'
 import { ProfileType } from '../../_types'
 
@@ -11,14 +11,14 @@ export default async function MyLibraryLayout({
   children: ReactNode
 }) {
   let nickName = '사용자'
-  try {
-    const cookieStore = await cookies()
-    const accessToken = cookieStore.get('accessToken')?.value
-    if (!accessToken) return
-  } catch (e) {
-    console.error('쿠키 조회 실패:', e)
-    return null
-  }
+  // try {
+  //   const cookieStore = await cookies()
+  //   const accessToken = cookieStore.get('accessToken')?.value
+  //   if (!accessToken) return
+  // } catch (e) {
+  //   console.error('쿠키 조회 실패:', e)
+  //   return null
+  // }
   try {
     const user = await fetchWithAuthOnServer<ProfileType>(
       '/api/user/profile',
