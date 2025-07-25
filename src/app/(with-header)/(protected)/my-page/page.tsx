@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { MonthlyBookType, StatisicType, TagBookType } from './_types'
 import { fetchWithAuthOnServer } from '@/lib/fetch-with-auth-server'
 import { BookType, ProfileType } from '../_types'
-import { cookies } from 'next/headers'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,9 +16,9 @@ export default async function MyPage() {
   let profileData: ProfileType | null = null
 
   try {
-    const cookieStore = await cookies()
-    const accessToken = cookieStore.get('accessToken')?.value
-    if (!accessToken) return
+    // const cookieStore = await cookies()
+    // const accessToken = cookieStore.get('accessToken')?.value
+    // if (!accessToken) return
 
     const results = await Promise.allSettled<
       [
