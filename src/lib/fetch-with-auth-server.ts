@@ -1,4 +1,4 @@
-import { cookies } from 'next/headers'
+import { headers } from 'next/headers'
 
 const API_URL_SERVER = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL!
 
@@ -10,72 +10,67 @@ export async function fetchWithAuthOnServer<T = unknown>(
   console.log('🔗 API_URL_SERVER:', API_URL_SERVER)
   
   try {
-    const cookieStore = await cookies()
+    // cookies() 대신 headers() 사용
+    const headersList = await headers()
+    const cookieHeader = headersList.get('cookie')
     
-    // 모든 쿠키 확인 (디버깅용)
-    const allCookies = cookieStore.getAll()
-    console.log('🍪 모든 쿠키 개수:', allCookies.length)
-    console.log('🍪 모든 쿠키 이름들:', allCookies.map(c => c.name))
+    console.log('🍪 원본 쿠키 헤더 존재:', !!cookieHeader)
+    console.log('🍪 쿠키 헤더 길이:', cookieHeader?.length || 0)
     
-    const access = cookieStore.get('accessToken')
-    const refresh = cookieStore.get('refreshToken')
-
-    console.log('🔑 accessToken 존재:', !!access?.value)
-    console.log('🔑 refreshToken 존재:', !!refresh?.value)
-    
-    // 토큰 값의 일부만 로그 (보안상)
-    if (access?.value) {
-      console.log('🔑 accessToken 앞 10자:', access.value.substring(0, 10) + '...')
-    }
-    if (refresh?.value) {
-      console.log('🔑 refreshToken 앞 10자:', refresh.value.substring(0, 10) + '...')
+    if (cookieHeader) {
+      console.log('🍪 쿠키 헤더 일부:', cookieHeader.substring(0, 100) + '...')
     }
 
-    let currentAccessToken = access?.value
-    let currentRefreshToken = refresh?.value
+    if (!cookieHeader) {
+      console.error('❌ 쿠키 헤더가 없습니다.')
+      throw new Error('인증 정보가 없습니다. 다시 로그인해주세요.')
+    }
 
-    // 토큰이 없으면 즉시 에러
+    // 쿠키에서 토큰 추출
+    const extractTokenFromCookie = (cookieString: string, tokenName: string): string | null => {
+      const regex = new RegExp(`${tokenName}=([^;]+)`)
+      const match = cookieString.match(regex)
+      return match ? match[1] : null
+    }
+
+    let currentAccessToken = extractTokenFromCookie(cookieHeader, 'accessToken')
+    let currentRefreshToken = extractTokenFromCookie(cookieHeader, 'refreshToken')
+
+    console.log('🔑 accessToken 존재:', !!currentAccessToken)
+    console.log('🔑 refreshToken 존재:', !!currentRefreshToken)
+
     if (!currentAccessToken || !currentRefreshToken) {
       console.error('❌ 필수 토큰이 없습니다.')
       throw new Error('인증 정보가 없습니다. 다시 로그인해주세요.')
     }
 
-    // 쿠키 헤더 생성 함수
-    const createCookieHeader = (accessToken: string, refreshToken: string) => {
-      const cookieHeader = `accessToken=${accessToken}; refreshToken=${refreshToken}`
-      console.log('🍪 생성된 쿠키 헤더 길이:', cookieHeader.length)
-      return cookieHeader
-    }
-
     // API 요청 함수
-    const makeRequest = async (accessToken: string) => {
-      const cookieHeader = createCookieHeader(accessToken, currentRefreshToken!)
+    const makeRequest = async (accessToken: string, refreshToken: string) => {
+      const requestCookie = `accessToken=${accessToken}; refreshToken=${refreshToken}`
       
-      const headers = new Headers(options.headers || {})
-      headers.set('Cookie', cookieHeader)
-      headers.set('Content-Type', 'application/json')
+      const requestHeaders = new Headers(options.headers || {})
+      requestHeaders.set('Cookie', requestCookie)
+      requestHeaders.set('Content-Type', 'application/json')
       
       console.log('📤 요청 URL:', `${API_URL_SERVER}${endpoint}`)
       console.log('📤 요청 메서드:', options.method || 'GET')
 
       const requestConfig: RequestInit = {
         ...options,
-        headers,
-        // Vercel 환경에서는 이것도 시도
+        headers: requestHeaders,
         cache: 'no-store',
       }
 
       console.log('📤 요청 시작...')
       const response = await fetch(`${API_URL_SERVER}${endpoint}`, requestConfig)
       console.log('📥 응답 상태:', response.status)
-      console.log('📥 응답 OK:', response.ok)
       
       return response
     }
 
     // 최초 요청
     console.log('🚀 최초 API 요청 시작')
-    let res = await makeRequest(currentAccessToken)
+    let res = await makeRequest(currentAccessToken, currentRefreshToken)
 
     // 401 에러시 토큰 갱신 시도
     if (res.status === 401) {
@@ -83,7 +78,7 @@ export async function fetchWithAuthOnServer<T = unknown>(
       
       try {
         const refreshHeaders = new Headers()
-        refreshHeaders.set('Cookie', createCookieHeader(currentAccessToken, currentRefreshToken))
+        refreshHeaders.set('Cookie', `accessToken=${currentAccessToken}; refreshToken=${currentRefreshToken}`)
         refreshHeaders.set('Content-Type', 'application/json')
         
         console.log('🔄 리프레시 요청 시작...')
@@ -106,7 +101,7 @@ export async function fetchWithAuthOnServer<T = unknown>(
         console.log('🍪 set-cookie 헤더 존재:', !!setCookieHeader)
         
         if (setCookieHeader) {
-          console.log('🍪 set-cookie 헤더 길이:', setCookieHeader.length)
+          console.log('🍪 set-cookie 헤더:', setCookieHeader)
           
           // 쿠키 파싱 개선
           const cookies = setCookieHeader.split(',').map(cookie => cookie.trim())
@@ -128,7 +123,7 @@ export async function fetchWithAuthOnServer<T = unknown>(
         }
 
         console.log('🔄 새 토큰으로 재요청')
-        res = await makeRequest(currentAccessToken)
+        res = await makeRequest(currentAccessToken, currentRefreshToken!)
         
       } catch (error) {
         console.error('❌ 토큰 갱신 실패:', error)
