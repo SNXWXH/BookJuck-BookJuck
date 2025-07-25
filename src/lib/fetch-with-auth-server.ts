@@ -115,6 +115,10 @@ export async function fetchWithAuthOnServer<T = unknown>(
   const makeRequest = async (accessToken: string | undefined) => {
     const cookieHeader = `accessToken=${accessToken}; refreshToken=${currentRefreshToken}`
 
+    console.log(
+      '🚀 ~ makeRequest ~ cookieHeaderrrrrrrrrrr:',
+      cookieHeader,
+    )
     const headers = new Headers(options.headers || {})
     headers.set('Cookie', cookieHeader)
 
