@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 
 const API_URL_SERVER = process.env.API_URL!
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     const cookieStore = await cookies()
     const accessToken = cookieStore.get('accessToken')?.value
@@ -51,7 +51,9 @@ export async function POST(request: NextRequest) {
 
       for (const cookiePart of cookieParts) {
         if (cookiePart.startsWith('accessToken=')) {
-          const newAccessToken = cookiePart.split('=')[1].split(';')[0]
+          const newAccessToken = cookiePart
+            .split('=')[1]
+            .split(';')[0]
           successResponse.cookies.set('accessToken', newAccessToken, {
             httpOnly: false,
             secure: process.env.NODE_ENV === 'production',
@@ -60,13 +62,19 @@ export async function POST(request: NextRequest) {
           })
           console.log('✅ accessToken 갱신 완료')
         } else if (cookiePart.startsWith('refreshToken=')) {
-          const newRefreshToken = cookiePart.split('=')[1].split(';')[0]
-          successResponse.cookies.set('refreshToken', newRefreshToken, {
-            httpOnly: false,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            path: '/',
-          })
+          const newRefreshToken = cookiePart
+            .split('=')[1]
+            .split(';')[0]
+          successResponse.cookies.set(
+            'refreshToken',
+            newRefreshToken,
+            {
+              httpOnly: false,
+              secure: process.env.NODE_ENV === 'production',
+              sameSite: 'lax',
+              path: '/',
+            },
+          )
           console.log('✅ refreshToken 갱신 완료')
         }
       }
