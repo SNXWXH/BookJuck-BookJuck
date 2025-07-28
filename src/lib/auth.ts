@@ -13,7 +13,8 @@ export async function login({
   email,
   password,
 }: LoginParamsType): Promise<LoginResponseType> {
-  const res = await fetch(`${API_URL}/api/auth/signin`, {
+  // Next.js API 라우트를 통해 로그인
+  const res = await fetch('/api/auth/login', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -24,10 +25,15 @@ export async function login({
 
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}))
-    throw new Error(errorData.message || '로그인에 실패했습니다.')
+    throw new Error(errorData.error || '로그인에 실패했습니다.')
   }
 
-  return res.json()
+  const result = await res.json()
+  
+  // 로그인 후 쿠키 확인
+  console.log('🍪 로그인 후 document.cookie:', document.cookie)
+  
+  return result
 }
 
 export async function signup({
