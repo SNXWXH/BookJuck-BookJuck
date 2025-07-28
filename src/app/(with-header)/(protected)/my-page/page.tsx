@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { MonthlyBookType, StatisicType, TagBookType } from './_types'
 import { fetchWithAuthOnServer } from '@/lib/fetch-with-auth-server'
 import { BookType, ProfileType } from '../_types'
+import { cookies } from 'next/headers'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,9 +17,9 @@ export default async function MyPage() {
   let profileData: ProfileType | null = null
 
   try {
-    // const cookieStore = await cookies()
-    // const accessToken = cookieStore.get('accessToken')?.value
-    // if (!accessToken) return
+    const cookieStore = await cookies()
+    const accessToken = cookieStore.get('accessToken')?.value
+    const refreshToken = cookieStore.get('refreshToken')?.value
 
     const results = await Promise.allSettled<
       [
@@ -29,11 +30,11 @@ export default async function MyPage() {
         Promise<ProfileType>,
       ]
     >([
-      fetchWithAuthOnServer('/api/reading/statistics'),
-      fetchWithAuthOnServer('/api/reading/monthly'),
-      fetchWithAuthOnServer('/api/reading/tags/statistics'),
-      fetchWithAuthOnServer('/api/library/review/recent'),
-      fetchWithAuthOnServer('/api/user/profile'),
+      fetchWithAuthOnServer('/api/reading/statistics', accessToken, refreshToken),
+      fetchWithAuthOnServer('/api/reading/monthly', accessToken, refreshToken),
+      fetchWithAuthOnServer('/api/reading/tags/statistics', accessToken, refreshToken),
+      fetchWithAuthOnServer('/api/library/review/recent', accessToken, refreshToken),
+      fetchWithAuthOnServer('/api/user/profile', accessToken, refreshToken),
     ])
 
     if (results[0].status === 'fulfilled')
