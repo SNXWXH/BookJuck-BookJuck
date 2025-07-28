@@ -3,8 +3,6 @@
 import { FetchWithAuthOptionsType } from '@/app/(without-header)/auth/_types'
 import { useAuthStore } from '@/store/auth-store'
 
-const API_URL_CLIENT = process.env.NEXT_PUBLIC_API_URL!
-
 // 클라이언트 전용 fetch
 export async function fetchWithAuth<T = unknown>(
   endpoint: string,
@@ -25,38 +23,14 @@ export async function fetchWithAuth<T = unknown>(
     credentials: 'include',
   }
 
-  let res = await fetch(
-    `${API_URL_CLIENT}${endpoint}`,
+  const res = await fetch(
+    `/api/proxy${endpoint}`,
     requestOptions,
   )
-  // console.log(res)
 
   if (res.status === 401) {
-    try {
-      const refreshRes = await fetch(
-        `${API_URL_CLIENT}/api/auth/refresh`,
-        {
-          method: 'POST',
-          credentials: 'include',
-        },
-      )
-
-      if (!refreshRes.ok) {
-        useAuthStore.getState().clearAuth()
-        throw new Error('세션이 만료되었습니다. 다시 로그인해주세요.')
-      }
-
-      res = await fetch(
-        `${API_URL_CLIENT}${endpoint}`,
-        requestOptions,
-      )
-    } catch (error) {
-      console.error('세션 갱신 실패:', error)
-      useAuthStore.getState().clearAuth()
-      throw new Error(
-        '세션 갱신에 실패했습니다. 다시 로그인해주세요.',
-      )
-    }
+    useAuthStore.getState().clearAuth()
+    throw new Error('세션이 만료되었습니다. 다시 로그인해주세요.')
   }
 
   if (!res.ok) {
